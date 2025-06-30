@@ -34,18 +34,7 @@ typedef struct {
 EFI_GUID Parse_UUID(char *str) {
     unsigned int data_1, data_2, data_3, data_4a, data_4b, data_4m, data_4n, data_4o, data_4x, data_4y, data_4z;
     sscanf(str, "%8x-%4x-%4x-%2x%2x-%2x%2x%2x%2x%2x%2x", &data_1, &data_2, &data_3, &data_4a, &data_4b, &data_4m, &data_4n, &data_4o, &data_4x, &data_4y, &data_4z);
-    EFI_GUID guid;// = { data_1, data_2, data_3, {data_4a, data_4b, data_4m, data_4n, data_4o, data_4x, data_4y, data_4z} };
-    guid.Data1 = data_1;
-    guid.Data2 = data_2;
-    guid.Data3 = data_3;
-    guid.Data4[0] = data_4a;
-    guid.Data4[1] = data_4b;
-    guid.Data4[2] = data_4m;
-    guid.Data4[3] = data_4n;
-    guid.Data4[4] = data_4o;
-    guid.Data4[5] = data_4x;
-    guid.Data4[6] = data_4y;
-    guid.Data4[7] = data_4z;
+    EFI_GUID guid = { data_1, data_2, data_3, {data_4a, data_4b, data_4m, data_4n, data_4o, data_4x, data_4y, data_4z} };
     return guid;
 }
 
