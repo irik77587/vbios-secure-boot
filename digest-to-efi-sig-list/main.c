@@ -7,13 +7,15 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <efi.h>
+#include <regex.h>
 
 #define SHA256_DIGEST_SIZE  (32)
 #define HASH_SIZE           (SHA256_DIGEST_SIZE)
 #define HASH_LENGTH         (HASH_SIZE*2)
+#define UUID_PATTERN        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 
 EFI_GUID EFI_CERT_SHA256_GUID = { 0xc1c41626, 0x504c, 0x4092, { 0xac, 0xa9, 0x41, 0xf9, 0x36, 0x93, 0x43, 0x28 } };
-EFI_GUID MOK_OWNER = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
+//EFI_GUID MOK_OWNER = { 0x605dab50, 0xe046, 0x4300, {0xab, 0xb6, 0x3d, 0xd8, 0x10, 0xdd, 0x8b, 0x23} };
 
 #pragma pack(1)
 typedef struct {
@@ -29,13 +31,46 @@ typedef struct {
 } EFI_SIGNATURE_LIST;
 #pragma pack()
 
+EFI_GUID Parse_UUID(char *str) {
+    unsigned int data_1, data_2, data_3, data_4a, data_4b, data_4m, data_4n, data_4o, data_4x, data_4y, data_4z;
+    sscanf(str, "%8x-%4x-%4x-%2x%2x-%2x%2x%2x%2x%2x%2x", &data_1, &data_2, &data_3, &data_4a, &data_4b, &data_4m, &data_4n, &data_4o, &data_4x, &data_4y, &data_4z);
+    EFI_GUID guid;// = { data_1, data_2, data_3, {data_4a, data_4b, data_4m, data_4n, data_4o, data_4x, data_4y, data_4z} };
+    guid.Data1 = data_1;
+    guid.Data2 = data_2;
+    guid.Data3 = data_3;
+    guid.Data4[0] = data_4a;
+    guid.Data4[1] = data_4b;
+    guid.Data4[2] = data_4m;
+    guid.Data4[3] = data_4n;
+    guid.Data4[4] = data_4o;
+    guid.Data4[5] = data_4x;
+    guid.Data4[6] = data_4y;
+    guid.Data4[7] = data_4z;
+    return guid;
+}
+
+int check_invalid_uuid(char *uuidstr)
+{
+    regex_t engine;
+    char errbuf[128];
+    int status = regcomp(&engine, UUID_PATTERN, REG_EXTENDED);
+    if (status != 0) {
+        regerror(status, &engine, errbuf, sizeof(errbuf));
+        fprintf(stderr, "Regex compile error: %s\n", errbuf);
+        return status;
+    }
+    int result = regexec(&engine, uuidstr, 0, NULL, 0);
+    regfree(&engine);
+    return result;
+}
+
 void usage(const char *str) {
-    fprintf(stderr, "Usage: %s SHA256SUM OUT_FILE\n", str);
+    fprintf(stderr, "Usage: %s SHA256SUM SIGN_OWNER_GUID OUT_FILE\n", str);
     exit(1);
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
+    if (argc < 3) {
         usage(argv[0]);
     }
 
@@ -43,6 +78,14 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "First argument should be an sha256 hash");
         exit(1);
     }
+
+    if (check_invalid_uuid(argv[2])) {
+        fprintf(stderr, "Second argument should be GUID of signature owner");
+        exit(1);
+    }
+
+    /* Read GUID of signature owner */
+    EFI_GUID MOK_OWNER = Parse_UUID(argv[2]);
 
     /* Read digest */
     unsigned char digest[HASH_SIZE];
@@ -68,9 +111,9 @@ int main(int argc, char *argv[]) {
     memcpy(&d->SignatureData, digest, sizeof(digest));
 
     /* Write file */
-    int fdoutfile = open(argv[2], O_CREAT|O_WRONLY|O_TRUNC, S_IWUSR|S_IRUSR);
+    int fdoutfile = open(argv[3], O_CREAT|O_WRONLY|O_TRUNC, S_IWUSR|S_IRUSR);
     if (fdoutfile == -1) {
-        fprintf(stderr, "Failed to open %s: ", argv[2]);
+        fprintf(stderr, "Failed to open %s: ", argv[3]);
         perror("");
         exit(1);
     }
